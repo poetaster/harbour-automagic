@@ -39,6 +39,8 @@ class Automagic:
   def _settings_defaults(self, settings: Dict[str, Any]) -> Dict[str, Any]:
     home = os.environ.get('HOME', '')
     settings.setdefault('export_base_path', os.path.join(home, 'Documents'))
+    settings.setdefault('library_token', secrets.token_urlsafe(24))
+    settings.setdefault('display_name', '')
     return settings
 
   def load_data(self) -> Dict[str, Any]:
@@ -55,11 +57,43 @@ class Automagic:
 
     return {
       "settings": settings,
+      "settings_privileged": self._load_privileged_settings(),
       "data_sources": self._sort_items(self.loadVersioned("data_sources.json")),
       "flows": self._sort_items(self.loadVersioned("flows.json")),
       "actions": self._sort_items(self.loadVersioned("actions.json")),
-      "value_maps": self.loadVersioned("value_maps.json", {})
+      "value_maps": self.loadVersioned("value_maps.json", {}),
+      "remotes": self._load_remotes()
     }
+
+  def _load_remotes(self):
+    remotes = self.loadVersioned("remotes.json", [])
+    if not isinstance(remotes, list) or len(remotes) == 0:
+      remotes = [{"id": "remote_default", "name": "Remote", "buttons": []}]
+    return remotes
+
+  def _load_privileged_settings(self) -> Dict[str, Any]:
+    path = os.path.join(self.config_path, "privileged.json")
+    result = {"exists": False, "secure": False, "allowed_run_as": []}
+
+    try:
+      st = os.stat(path)
+    except FileNotFoundError:
+      return result
+    except Exception as e:
+      print(f"Error checking privileged.json: {e}")
+      return result
+
+    result["exists"] = True
+    result["secure"] = (st.st_uid == 0) and (st.st_mode & 0o022 == 0)
+
+    try:
+      with open(path, 'r') as f:
+        content = json.load(f)
+      result["allowed_run_as"] = content.get("allowed_run_as", [])
+    except Exception as e:
+      print(f"Error reading privileged.json: {e}")
+
+    return result
 
   def load_import_folder(self, folder_path: str) -> Dict[str, Any]:
     files = {
@@ -67,6 +101,7 @@ class Automagic:
       "data_sources.json":("data_sources", []),
       "actions.json":     ("actions",      []),
       "value_maps.json":  ("value_maps",   {}),
+      "remotes.json":     ("remotes",      []),
     }
     result = {}
     for filename, (key, default) in files.items():
@@ -86,7 +121,8 @@ class Automagic:
     if os.path.exists(path):
       try:
         with open(path, 'r') as f:
-          result['info'] = json.load(f)
+          content = json.load(f)
+          result['info'] = content.get("data", content)
       except Exception as e:
         print(f"Error loading info for import: {e}")
         pyotherside.send("error", "automagic", "load_import_folder", str(e))
@@ -223,10 +259,10 @@ class Automagic:
     pyotherside.send("progress", "automagic", "listener", "disconnected")
     sys.stdout.flush()
 
-  def _send(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+  def _send(self, payload: Dict[str, Any], timeout: float = 2.0) -> Dict[str, Any]:
     try:
       with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-        s.settimeout(2.0)
+        s.settimeout(timeout)
         s.connect(self.socket_path)
         
         s.sendall((json.dumps({"secret": self.secret}) + "\n").encode("utf-8"))
@@ -257,8 +293,8 @@ class Automagic:
     print("exec_trigger:", result)
     return True
 
-  def exec_flow(self, flow_id):
-    payload = {"cmd": "execute_flow", "flow": flow_id, "vars": {}}
+  def exec_flow(self, flow_id, vars):
+    payload = {"cmd": "execute_flow", "flow": flow_id, "vars": vars}
     result = self._send(payload)
     print("exec_flow:", result)
     return True
@@ -268,6 +304,20 @@ class Automagic:
     result = self._send(payload)
     print("daemon_reload:", result)
     return True
+
+  def update_privileged_config(self, allowed_run_as):
+    print("update_privileged_config - requesting:", allowed_run_as)
+    # generous timeout - the daemon blocks here while PolicyKit shows the
+    # authentication prompt and waits for the user to respond.
+    result = self._send({"cmd": "update_privileged_config", "allowed_run_as": allowed_run_as}, timeout=150.0)
+    print("update_privileged_config - result:", result)
+
+    if result.get("ok"):
+      pyotherside.send("success", "automagic", "update_privileged_config", "Privileged settings updated")
+    else:
+      pyotherside.send("error", "automagic", "update_privileged_config", result.get("error", "unknown error"))
+
+    return result
 
   def get_templates(self):
     current_year = date.today().year
@@ -315,7 +365,7 @@ class Automagic:
             "fields": [
               { "key": "name", "label": "State Name", "ui_type": "string", "placeholder": "e.g., lamp_status" },
               [
-                { "key": "static", "label": "Static Value", "ui_type": "string", "placeholder": "static value" },
+                { "key": "static", "label": "Static Value", "ui_type": "string", "cast": True, "placeholder": "true / false / null / 42 / text" },
                 { "key": "variable", "label": "Variable Name", "ui_type": "string", "placeholder": "variable name" },
                 { "key": "template", "label": "Template", "ui_type": "string", "placeholder": "{{temp}} °C" }
               ]
@@ -326,7 +376,7 @@ class Automagic:
             "fields": [
               { "key": "name", "label": "Variable Name", "ui_type": "string", "placeholder": "e.g., initial_value" },
               [
-                { "key": "static", "label": "Static Value", "ui_type": "string", "placeholder": "static value" },
+                { "key": "static", "label": "Static Value", "ui_type": "string", "cast": True, "placeholder": "true / false / null / 42 / text" },
                 { "key": "variable", "label": "Variable Name", "ui_type": "string", "placeholder": "variable name" },
                 { "key": "template", "label": "Template", "ui_type": "string", "placeholder": "{{temp}} °C" }
               ]
@@ -518,6 +568,7 @@ class Automagic:
             "name": "Shell",
             "fields": [
               { "key": "command", "label": "Command", "ui_type": "string" },
+              { "key": "run_as", "label": "Run As User", "ui_type": "string", "default": "" },
             ]
           }
         },
@@ -595,11 +646,12 @@ class Automagic:
                 ]
               },
               { "key": "pattern", "label": "Regex Pattern", "ui_type": "string", "placeholder": "(?P<name>\\\\d+)" },
-              { "key": "delimiter", "label": "Delimiter", "ui_type": "string", "placeholder": "\n" }
+              { "key": "delimiter", "label": "Delimiter", "ui_type": "string", "placeholder": "\n" },
+              { "key": "interval", "label": "Interval", "ui_type": "string", "placeholder": "30s" }
             ],
             "output_label": "Output",
             "output_hint": "arg0-n | json keys | config file keys",
-            "trigger_mode": "never"
+            "trigger_mode": "optional"
           },
           "dbus": {
             "name": "DBus Connection",
@@ -704,6 +756,48 @@ class Automagic:
             "output_label": "Output Variables",
             "output_hint": "latitude, longitude, altitude, accuracy, vertical_accuracy, timestamp, provider",
             "trigger_mode": "optional"
+          },
+          "shell": {
+            "name": "Shell",
+            "fields": [
+              { "key": "command", "label": "Command", "ui_type": "string" },
+              { "key": "run_as", "label": "Run As User", "ui_type": "string", "default": "" },
+              { "key": "format", "label": "Result Payload Format", "ui_type": "string", "default": "split", "options": [
+                  { "value": "raw", "label": "Raw String" },
+                  { "value": "json", "label": "JSON Object" },
+                  { "value": "split", "label": "Split by Delimiter" },
+                  { "value": "regex", "label": "Regex Match" },
+                  { "value": "conf", "label": "Config File" },
+                  { "value": "none", "label": "No Parsing" }
+                ]
+              },
+              { "key": "pattern", "label": "Regex Pattern", "ui_type": "string", "placeholder": "(?P<name>\\\\d+)" },
+              { "key": "delimiter", "label": "Delimiter", "ui_type": "string", "placeholder": "\n", "default": "\n" }
+            ],
+            "output_label": "Output",
+            "output_hint": "arg0-n | json keys | config file keys",
+            "trigger_mode": "never"
+          },
+          "ping": {
+            "name": "ICMP Ping",
+            "fields": [
+              { "key": "address", "label": "Network Address", "ui_type": "string", "placeholder": "192.168.0.1" },
+              { "key": "interval", "label": "Interval", "ui_type": "string", "default": "30s" },
+              { "key": "timeout", "label": "Timeout", "ui_type": "string", "default": "2s" },
+              { "key": "count", "label": "Count", "ui_type": "string", "cast": True, "default": 1, "placeholder": "3" }
+            ],
+            "output_label": "Output Variables",
+            "output_hint": "reachable, rtt_ms, rtt_min_ms, rtt_max_ms, packet_loss | current_state, previous_state ",
+            "trigger_mode": "optional"
+          },
+          "input_device": {
+            "name": "Physical Button",
+            "fields": [
+              { "key": "path", "label": "Device Classes (comma-separated)", "ui_type": "string", "placeholder": "gpio_keys, power-on", "default": "gpio_keys" }
+            ],
+            "output_label": "Output Variables",
+            "output_hint": "device, key_code, key_name, key_value",
+            "trigger_mode": "always"
           }
         }
       }

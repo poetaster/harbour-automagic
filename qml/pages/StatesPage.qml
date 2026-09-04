@@ -14,8 +14,13 @@ Item {
         onClicked: pageStack.push(Qt.resolvedUrl("SettingsDialog.qml"))
       }
       MenuItem {
-        text: "Export"
-        onClicked: pageStack.push(Qt.resolvedUrl("ExportDialog.qml"))
+        text: "Export to Folder"
+        onClicked: pageStack.push(Qt.resolvedUrl("ExportDialog.qml"), { mode: "export" })
+      }
+      MenuItem {
+        text: "Upload to Library"
+        visible: !!(app.settings && app.settings.library_token && app.settings.display_name)
+        onClicked: pageStack.push(Qt.resolvedUrl("ExportDialog.qml"), { mode: "upload" })
       }
       MenuItem {
         text: "Import"
@@ -31,7 +36,43 @@ Item {
       }
     }
 
-    header: PageHeader { title: "States" }
+    header: Item {
+      width: parent.width
+      height: Theme.itemSizeLarge + Theme.paddingLarge
+
+      Item {
+        anchors {
+          bottom: parent.bottom
+          bottomMargin: Theme.paddingMedium
+          left: parent.left
+          right: parent.right
+        }
+        height: states_header_btn.height
+
+        SecondaryButton {
+          id: states_header_btn
+          preferredWidth: parent.width
+          text: "States"
+          layoutDirection: Qt.RightToLeft
+          anchors {
+            verticalCenter: parent.verticalCenter
+            horizontalCenter: parent.horizontalCenter
+          }
+          onClicked: pageStack.push(Qt.resolvedUrl("RemotePickerPage.qml"))
+        }
+
+        Icon {
+          source: "../../icons/arrow_forward.svg"
+          height: 60
+          width: height
+          anchors {
+            verticalCenter: states_header_btn.verticalCenter
+            right: states_header_btn.right
+            rightMargin: Theme.paddingLarge
+          }
+        }
+      }
+    }
 
     model: ListModel { id: list_model }
 
@@ -79,31 +120,24 @@ Item {
   }
 
   Rectangle {
-    width: parent.width
-    height: Theme.itemSizeMedium
-    anchors.bottom: parent.bottom
-    color: Theme.rgba(Theme.highlightBackgroundColor, 0.5)
+    anchors {
+      left: parent.left
+      right: parent.right
+      bottom: parent.bottom
+    }
+    height: disconnected_label.height + Theme.paddingMedium * 2
+    color: Theme.rgba(Theme.highlightBackgroundColor, 0.8)
     opacity: app.connected ? 0.0 : 1.0
     visible: opacity > 0
 
     Behavior on opacity { FadeAnimation {} }
 
-    Row {
+    Label {
+      id: disconnected_label
       anchors.centerIn: parent
-      spacing: Theme.paddingMedium
-
-      Icon {
-        source: "image://theme/icon-m-warning"
-        color: Theme.primaryColor
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Label {
-        text: "Daemon disconnected"
-        color: Theme.primaryColor
-        font.pixelSize: Theme.fontSizeSmall
-        anchors.verticalCenter: parent.verticalCenter
-      }
+      text: "Daemon disconnected"
+      color: Theme.highlightColor
+      font.pixelSize: Theme.fontSizeSmall
     }
   }
 

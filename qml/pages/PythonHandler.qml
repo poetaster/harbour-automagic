@@ -49,13 +49,18 @@ Python {
   function load_data() {
     call('automagic.automagic_object.load_data', [], function(result) {
       app.settings = result.settings
+      app.settings_privileged = result.settings_privileged || {}
       app.dynamic_page = String(app.settings.dynamic_page)
       app.data_sources = result.data_sources
       app.actions = result.actions
       app.flows = result.flows
       app.value_maps = result.value_maps
+      var remotes = result.remotes || []
+      if (remotes.length === 0) remotes = [{ "id": "remote_default", "name": "Remote", "buttons": [] }]
+      app.remotes = remotes
 
       app.signal_settings_changed(result.settings)
+      app.signal_update_remotes(app.remotes)
       app.signal_update_data_sources(result.data_sources)
       app.signal_update_actions(result.actions)
       app.signal_update_flows(result.flows)
@@ -70,9 +75,11 @@ Python {
     });
   }
 
-  function exec_flow(flow_id) {
+  function exec_flow(flow_id, variables) {
+    if (!variables) { variables = {}};
+
     console.log("exec_flow - id:", flow_id)
-    call('automagic.automagic_object.exec_flow', [flow_id], function(result) {
+    call('automagic.automagic_object.exec_flow', [flow_id, variables], function(result) {
       console.log("exec_flow - result:", result)
     });
   }
@@ -80,6 +87,15 @@ Python {
   function daemon_reload() {
     call('automagic.automagic_object.daemon_reload', [], function(result) {
       console.log("daemon_reload - result:", result)
+    });
+  }
+
+  function update_privileged_config(allowed_run_as) {
+    call('automagic.automagic_object.update_privileged_config', [allowed_run_as], function(result) {
+      console.log("update_privileged_config - result:", JSON.stringify(result))
+      if (result && result.ok) {
+        load_data()
+      }
     });
   }
 
@@ -108,6 +124,10 @@ Python {
     save_json_file(app.settings, "settings.json")
   }
 
+  function save_remotes() {
+    save_json_file(app.remotes, "remotes.json")
+  }
+
   function handle_error(module_id, method_id, description) {
     console.log('Module ERROR - source:', module_id, method_id, 'error:', description);
 
@@ -122,6 +142,7 @@ Python {
     if (progress_state == "connected") {
       console.log("Daemon status: connected")
       app.connected = true
+      get_states()
     }
     if (progress_state == "disconnected") {
       console.log("Daemon status: disconnected")
@@ -136,6 +157,7 @@ Python {
 
   function handle_state_changed(state, value) {
     console.log('state:', state, "value:", value);
+    app.states[state] = value
     app.signal_state_changed(state, value)
   }
 

@@ -99,6 +99,7 @@ Dialog {
         var val = item.pValue
         if (val === "true") val = true
         else if (val === "false") val = false
+        else if (val === "null") val = null
         else if (!isNaN(val) && val.trim() !== "") val = parseFloat(val)
         
         out[item.pKey] = val

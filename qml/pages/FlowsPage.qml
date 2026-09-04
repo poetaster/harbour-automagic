@@ -10,10 +10,8 @@ Item {
 
     PullDownMenu {
       MenuItem {
-        text: "Library"
-        onClicked: {
-          pageStack.push(Qt.resolvedUrl("LibraryPage.qml"), {})
-        }
+        text: "Community Library"
+        onClicked: pageStack.push(Qt.resolvedUrl("CommunityPage.qml"))
       }
       MenuItem {
         text: "Add Flow"

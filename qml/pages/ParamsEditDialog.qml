@@ -234,9 +234,10 @@ Dialog {
               packed.push({
                 "key": field[j].key,
                 "type": "string",
+                "cast": field[j].cast === true,
                 "value": String(root.formValues[field[j].key])
               })
-              break 
+              break
             }
           }
         } else {

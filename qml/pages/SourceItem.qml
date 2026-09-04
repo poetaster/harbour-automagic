@@ -30,6 +30,8 @@ Item {
       case "mysql":     return "../../icons/icon-m-db.svg"
       case "imap":      return "image://theme/icon-m-mail"
       case "location":  return "image://theme/icon-m-location"
+      case "shell":     return "image://theme/icon-m-tab-return"
+      case "ping":      return "image://theme/icon-l-computer"
       default:          return "image://theme/icon-m-diagnostic"
     }
   }

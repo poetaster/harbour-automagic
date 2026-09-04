@@ -15,6 +15,7 @@ ApplicationWindow {
   signal signal_update_value_maps(var data)
   signal signal_state_changed(string state_name, var data)
   signal signal_log_received(string flow_id, string step_id, string run_id, string message)
+  signal signal_update_remotes(var data)
 
   property string version: "0.1"
   
@@ -23,8 +24,10 @@ ApplicationWindow {
   property var flows
   property var actions
   property var value_maps
-  property var states
+  property var states: {"ui": true}
   property var settings
+  property var settings_privileged: ({})
+  property var remotes: []
   property bool busy
   property bool connected
   property string dynamic_page: "states"

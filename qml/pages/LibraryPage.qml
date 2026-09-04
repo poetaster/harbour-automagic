@@ -48,7 +48,7 @@ Page {
         Row {
           spacing: Theme.paddingSmall
           anchors.topMargin: Theme.paddingSmall
-          visible: !!modelData.data_sources || !!modelData.actions || !!modelData.flows || !!modelData.value_maps
+          visible: !!modelData.data_sources || !!modelData.actions || !!modelData.flows || !!modelData.value_maps || !!modelData.remotes
 
           Rectangle {
             visible: !!modelData.data_sources
@@ -109,6 +109,22 @@ Page {
               id: mapLabel
               anchors.centerIn: parent
               text: "Value Maps"
+              font.pixelSize: Theme.fontSizeExtraSmall
+              color: Theme.primaryColor
+            }
+          }
+
+          Rectangle {
+            visible: !!modelData.remotes
+            width: remoteLabel.width + Theme.paddingMedium
+            height: remoteLabel.height + Theme.paddingSmall
+            color: Theme.rgba(Theme.primaryColor, 0.1)
+            opacity: 0.5
+            radius: Theme.paddingSmall / 2
+            Label {
+              id: remoteLabel
+              anchors.centerIn: parent
+              text: "Remote"
               font.pixelSize: Theme.fontSizeExtraSmall
               color: Theme.primaryColor
             }
@@ -178,7 +194,8 @@ Page {
       flows:        (example.flows        && example.flows.data)        ? example.flows.data        : [],
       data_sources: (example.data_sources && example.data_sources.data) ? example.data_sources.data : [],
       actions:      (example.actions      && example.actions.data)      ? example.actions.data      : [],
-      value_maps:   (example.value_maps   && example.value_maps.data)   ? example.value_maps.data   : {}
+      value_maps:   (example.value_maps   && example.value_maps.data)   ? example.value_maps.data   : {},
+      remotes:      (example.remotes      && example.remotes.data)      ? example.remotes.data      : []
     }
 
     var conflicts = _findConflicts(data)
@@ -217,6 +234,11 @@ Page {
     var maps = data.value_maps || {}
     for (var key in maps)
       if (app.value_maps[key] !== undefined) conflicts.push("Value Map: " + key)
+
+    var remotes = data.remotes || []
+    for (var r = 0; r < remotes.length; r++)
+      for (var ri = 0; ri < app.remotes.length; ri++)
+        if (app.remotes[ri].id === remotes[r].id) { conflicts.push("Remote: " + (remotes[r].name || remotes[r].id)); break }
 
     return conflicts
   }
@@ -268,6 +290,20 @@ Page {
       for (var key in maps) currentMaps[key] = maps[key]
       app.value_maps = {}; app.value_maps = currentMaps
       python.save_value_maps()
+    }
+
+    var remotes = data.remotes || []
+    if (remotes.length > 0) {
+      var remList = app.remotes.slice()
+      for (var ri = 0; ri < remotes.length; ri++) {
+        if (overwrite)
+          for (var rj = remList.length - 1; rj >= 0; rj--)
+            if (remList[rj].id === remotes[ri].id) { remList.splice(rj, 1); break }
+        remList.push(remotes[ri])
+      }
+      app.remotes = remList
+      python.save_remotes()
+      app.signal_update_remotes(app.remotes)
     }
 
     python.load_data()

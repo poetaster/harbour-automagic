@@ -176,6 +176,16 @@ Page {
       }
     }
 
+    var remotes = data.remotes || []
+    for (var r = 0; r < remotes.length; r++) {
+      for (var ri = 0; ri < app.remotes.length; ri++) {
+        if (app.remotes[ri].id === remotes[r].id) {
+          conflicts.push("Remote: " + (remotes[r].name || remotes[r].id))
+          break
+        }
+      }
+    }
+
     return conflicts
   }
 
@@ -200,6 +210,11 @@ Page {
     var maps = data.value_maps || {}
     for (var key in maps) {
       items.push("Value Map: " + key)
+    }
+
+    var remotes = data.remotes || []
+    for (var r = 0; r < remotes.length; r++) {
+      items.push("Remote: " + (remotes[r].name || remotes[r].id))
     }
 
     return items
@@ -264,6 +279,22 @@ Page {
       app.value_maps = {}
       app.value_maps = currentMaps
       python.save_value_maps()
+    }
+
+    var remotes = data.remotes || []
+    if (remotes.length > 0) {
+      var remList = app.remotes.slice()
+      for (var ri = 0; ri < remotes.length; ri++) {
+        if (overwrite) {
+          for (var rj = remList.length - 1; rj >= 0; rj--) {
+            if (remList[rj].id === remotes[ri].id) { remList.splice(rj, 1); break }
+          }
+        }
+        remList.push(remotes[ri])
+      }
+      app.remotes = remList
+      python.save_remotes()
+      app.signal_update_remotes(app.remotes)
     }
 
     python.load_data()

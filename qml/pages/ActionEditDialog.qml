@@ -125,6 +125,7 @@ Dialog {
               width: parent.width - delParamBtn.width
               label: "Key"
               text: model.pKey
+              inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhLatinOnly
               onTextChanged: if (focus) paramsModel.setProperty(index, "pKey", text)
             }
             IconButton {
@@ -138,6 +139,7 @@ Dialog {
             width: parent.width
             label: "Value"
             text: model.pValue
+            inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhLatinOnly
             onTextChanged: if (focus) paramsModel.setProperty(index, "pValue", text)
           }
           Separator { width: parent.width; color: Theme.primaryColor; opacity: 0.5 }

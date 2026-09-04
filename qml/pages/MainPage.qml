@@ -9,7 +9,7 @@ Page {
   property bool startup_tab_set: false
 
   onDynamicPageChanged: {
-    var newTitle = dynamicPage === "logs" ? "Log" : "States"
+    var newTitle = dynamicPage === "logs" ? "Log" : (dynamicPage === "remote" ? "Remote" : "States")
     tab_model.setProperty(3, "title", newTitle)
   }
 
@@ -58,7 +58,9 @@ Page {
       TabItem {
         Loader {
           anchors.fill: parent
-          sourceComponent: main_page.dynamicPage === "logs" ? logs_page_comp : states_page_comp
+          sourceComponent: main_page.dynamicPage === "logs" ? logs_page_comp
+                         : main_page.dynamicPage === "remote" ? remote_page_comp
+                         : states_page_comp
         }
       }
     }
@@ -91,6 +93,13 @@ Page {
   Component {
     id: logs_page_comp
     LogsPage {
+      anchors.fill: parent
+    }
+  }
+
+  Component {
+    id: remote_page_comp
+    RemotePage {
       anchors.fill: parent
     }
   }

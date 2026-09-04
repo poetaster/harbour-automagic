@@ -88,6 +88,9 @@ Dialog {
           MenuItem { text: "STATE"; onClicked: root.editedType = "state" }
           MenuItem { text: "IMAP"; onClicked: root.editedType = "imap" }
           MenuItem { text: "LOCATION"; onClicked: root.editedType = "location" }
+          MenuItem { text: "SHELL"; onClicked: root.editedType = "shell" }
+          MenuItem { text: "PING"; onClicked: root.editedType = "ping" }
+          MenuItem { text: "INPUT_DEVICE"; onClicked: root.editedType = "input_device" }
         }
         onValueChanged: {
           if (app.templates && app.templates.ui_schema && app.templates.ui_schema.source_types[root.editedType]) {
@@ -197,6 +200,7 @@ Dialog {
               id: ttype_cbox
               width: parent.width - deleteTransformBtn.width - optional_switch.width
               label: "Type"; value: model.tType
+              currentIndex: ["copy", "template", "value_map", "math", "round", "uppercase", "lowercase", "trim", "replace", "regex_replace", "find_in_array"].indexOf(model.tType)
               menu: ContextMenu {
                 MenuItem { text: "copy"; onClicked: transformModel.setProperty(index, "tType", "copy") }
                 MenuItem { text: "template"; onClicked: transformModel.setProperty(index, "tType", "template") }
@@ -208,6 +212,7 @@ Dialog {
                 MenuItem { text: "trim"; onClicked: transformModel.setProperty(index, "tType", "trim") }
                 MenuItem { text: "replace"; onClicked: transformModel.setProperty(index, "tType", "replace") }
                 MenuItem { text: "regex_replace"; onClicked: transformModel.setProperty(index, "tType", "regex_replace") }
+                MenuItem { text: "find_in_array"; onClicked: transformModel.setProperty(index, "tType", "find_in_array") }
               }
             }
             TextSwitch {
@@ -223,7 +228,9 @@ Dialog {
             }
           }
           TextField {
-            width: parent.width; label: "Input Variable"; text: model.tIn
+            width: parent.width
+            label: model.tType === "find_in_array" ? "Array Variable" : "Input Variable"
+            text: model.tIn
             inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhLatinOnly
             onTextChanged: if (focus) transformModel.setProperty(index, "tIn", text)
           }
@@ -267,6 +274,30 @@ Dialog {
             label: "Replace"
             text: model.tReplace
             onTextChanged: if (focus) transformModel.setProperty(index, "tReplace", text)
+          }
+          TextField {
+            width: parent.width
+            visible: model.tType === "find_in_array"
+            inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhLatinOnly
+            label: "Match Path (within each array element)"
+            text: model.tMatchPath
+            onTextChanged: if (focus) transformModel.setProperty(index, "tMatchPath", text)
+          }
+          TextField {
+            width: parent.width
+            visible: model.tType === "find_in_array"
+            inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhLatinOnly
+            label: "Match Value"
+            text: model.tMatchValue
+            onTextChanged: if (focus) transformModel.setProperty(index, "tMatchValue", text)
+          }
+          TextField {
+            width: parent.width
+            visible: model.tType === "find_in_array"
+            inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText | Qt.ImhLatinOnly
+            label: "Extract Path (within matched element)"
+            text: model.tExtractPath
+            onTextChanged: if (focus) transformModel.setProperty(index, "tExtractPath", text)
           }
           Separator { width: parent.width; color: Theme.primaryColor; opacity: 0.8 }
         }
@@ -335,7 +366,10 @@ Dialog {
           "tDecimal": tr.decimal_places || 0,
           "tReplace": tr.replace || "",
           "tSearch": tr.search || "",
-          "tPattern": tr.pattern || ""
+          "tPattern": tr.pattern || "",
+          "tMatchPath": tr.match_path || "",
+          "tMatchValue": tr.match_value || "",
+          "tExtractPath": tr.extract_path || ""
         })
       }
     }
@@ -374,6 +408,13 @@ Dialog {
           if (root.currentTemplate.fields[f].key === k) {
             var uiType = root.currentTemplate.fields[f].ui_type
             
+            if (root.currentTemplate.fields[f].cast === true) {
+              var sv = String(val).trim()
+              if (sv === "true")       val = true
+              else if (sv === "false") val = false
+              else if (sv === "null")  val = null
+              else if (sv !== "" && !isNaN(Number(sv))) val = Number(sv)
+            }
             if (uiType === "boolean") {
               val = (val === true || String(val).toLowerCase() === "true")
             } else if (uiType === "array" || uiType === "array_integer") {
@@ -442,6 +483,11 @@ Dialog {
       if (tm.tType === "regex_replace") {
         tObj.pattern = tm.tPattern
         tObj.replace = tm.tReplace
+      }
+      if (tm.tType === "find_in_array") {
+        tObj.match_path = tm.tMatchPath
+        tObj.match_value = tm.tMatchValue
+        tObj.extract_path = tm.tExtractPath
       }
       tArr.push(tObj)
     }

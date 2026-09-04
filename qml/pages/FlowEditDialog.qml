@@ -238,8 +238,9 @@ Dialog {
           if (step.params) {
             for (var k in step.params) {
               var val = step.params[k]
+              if (val === undefined) val = null
               var valType = typeof val === "boolean" ? "bool" : (typeof val === "number" ? "number" : "string")
-              pArray.push({"key": k, "type": valType, "value": String(val)})
+              pArray.push({"key": k, "type": valType, "value": val === null ? "null" : String(val), "cast": val === null})
             }
           }
           initData.targetType =  step["function"] ? "function" : "action"
@@ -281,20 +282,22 @@ Dialog {
           if (step.params) {
             for (var gk in step.params) {
               var gVal = step.params[gk]
+              if (gVal === undefined) gVal = null
               var gType = typeof gVal === "boolean" ? "bool" : (typeof gVal === "number" ? "number" : "string")
-              getPArray.push({"key": gk, "type": gType, "value": String(gVal)})
+              getPArray.push({"key": gk, "type": gType, "value": gVal === null ? "null" : String(gVal), "cast": gVal === null})
             }
           }
           initData.paramsArray = getPArray
         } else if (step.type === "string") {
           initData.functionId = step["function"] || ""
-          
+
           var getPArray = []
           if (step.params) {
             for (var gk in step.params) {
               var gVal = step.params[gk]
+              if (gVal === undefined) gVal = null
               var gType = typeof gVal === "boolean" ? "bool" : (typeof gVal === "number" ? "number" : "string")
-              getPArray.push({"key": gk, "type": gType, "value": String(gVal)})
+              getPArray.push({"key": gk, "type": gType, "value": gVal === null ? "null" : String(gVal), "cast": gVal === null})
             }
           }
           initData.paramsArray = getPArray
@@ -467,6 +470,13 @@ Dialog {
             pMap[param.key] = Number(param.value)
           } else if (param.type === "bool") {
             pMap[param.key] = (param.value === "true" || param.value === true)
+          } else if (param.cast) {
+            var sv = param.value
+            if (sv === "true")       { pMap[param.key] = true }
+            else if (sv === "false") { pMap[param.key] = false }
+            else if (sv === "null")  { pMap[param.key] = null }
+            else if (sv !== "" && sv !== null && !isNaN(Number(sv))) { pMap[param.key] = Number(sv) }
+            else                     { pMap[param.key] = sv }
           } else {
             pMap[param.key] = param.value
           }
@@ -477,7 +487,7 @@ Dialog {
     }
 
     var updatedFlow = {
-      "id": flowData ? flowData.id : "new_flow",
+      "id": (flowData && flowData.id) ? flowData.id : "flow_" + Math.random().toString(36).substr(2, 9),
       "name": editedName,
       "enabled": root.editedEnabled,
       "triggers": editedTriggers,
